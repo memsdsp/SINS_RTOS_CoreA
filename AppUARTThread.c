@@ -9,9 +9,17 @@
 #include <drivers/uart/adi_uart.h>
 #include <services/gpio/adi_gpio.h>
 #include <stdio.h>
+#include "X_report.h"
+
+/*-------------------Externals------------------------*/
+extern OS_MUTEX   MutexUARTSend;
 
 /* UART driver memory */
 uint8_t driverMemory[ADI_UART_UNIDIR_DMA_MEMORY_SIZE];
+
+static PKT uart_packet;
+static float float_channels[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+static uint8_t uart_tx_buffer[128];
 
 void AppUARTThread(void* arg)
 {
@@ -104,8 +112,12 @@ void AppUARTThread(void* arg)
 				printf("UART GetTxBuffer Error\n");
 				while(1){ ; }
 			}
+
+			pktADC(&uart_packet, float_channels);
+			uint8_t len = fill_buffer(&uart_packet, uart_tx_buffer);
+
 			/* submit the data to the UART device */
-			result = adi_uart_SubmitTxBuffer(hDevice, buffer, sizeof(buffer));
+			result = adi_uart_SubmitTxBuffer(hDevice, uart_tx_buffer, len);
 			if (result != ADI_UART_SUCCESS){
 				printf("UART SubmitTxBuffer Error\n");
 				while(1){ ; }

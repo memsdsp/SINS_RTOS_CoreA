@@ -17,10 +17,11 @@
 #include "AppSPORTThread.h"
 #include "AppUARTThread.h"
 
-/* ------------------ Externals------------------ */
-extern TaskGlobals AppTaskSPORTGlobals;
-extern TaskGlobals AppTaskUARTGlobals;
 
+
+/* ------------------ Globals------------------ */
+TaskGlobals AppTaskSPORTGlobals;
+TaskGlobals AppTaskUARTGlobals;
 
 void AppStartThread(void* arg)
 {

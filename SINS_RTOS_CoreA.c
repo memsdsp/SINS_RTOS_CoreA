@@ -14,10 +14,15 @@
 #include "AppStartThread.h"
 #include "GPIOServices.h"
 
+
+//Global OS Objects
+OS_MUTEX   MutexUARTSend;
+
 //Global Threads Stack Data
-TaskGlobals AppTaskStartGlobals;
-TaskGlobals AppTaskSPORTGlobals;
-TaskGlobals AppTaskUARTGlobals;
+static TaskGlobals AppTaskStartGlobals;
+
+//General Globals
+float adc_decimated_channels[8];
 
 int main(void)
 {
@@ -38,6 +43,15 @@ int main(void)
 
 	//Initialize GPIO Service to enable FPGA data ready semaphore
 	InitGPIOServices();
+
+	/* Create Mutex to control UART send data */
+    OSMutexCreate((OS_MUTEX  *)&MutexUARTSend,
+    		(CPU_CHAR   *)"SINS_RTOS: MutexUARTSend",
+    		(OS_ERR     *)&err);
+	if (err != OS_ERR_NONE){
+		printf("Error creating Mutex");
+		while(1){ ; }
+	}
 
 	/* Create the boot task*/
 	OSTaskCreate (&( AppTaskStartGlobals.TaskTCB), 		/* address of TCB */

@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <stdlib.h>
 #include <ccblkfn.h>
 #include <app_cfg.h>
@@ -18,12 +19,19 @@
 #include "GPIOServices.h"
 
 #define SIZE_OF_RX_BUFFER 32
+#define CHANNELS_NUMBER 8
+
+/*-------------------Externals------------------------*/
+extern OS_MUTEX   MutexUARTSend;
+extern float adc_decimated_channels[CHANNELS_NUMBER];
 
 /* SPORT driver memory */
 uint8_t DeviceMemory[ADI_SPORT_DMA_MEMORY_SIZE];
 
 /* Tx buffers-0 */
 uint8_t SPORTRxBuffer[SIZE_OF_RX_BUFFER];
+
+static float dec_channels[CHANNELS_NUMBER];
 
 
 void AppSPORTThread(void* arg)
@@ -40,6 +48,9 @@ void AppSPORTThread(void* arg)
 
 	CPU_TS  ts;
 	OS_ERR err;
+
+	static uint8_t dec_cnt = 0;
+	uint8_t i;
 
 	/* open the SPORT driver */
 	eResult = adi_sport_Open(0,ADI_SPORT_DIR_RX, ADI_SPORT_SERIAL_MODE, DeviceMemory,
@@ -114,8 +125,7 @@ void AppSPORTThread(void* arg)
 	while (DEF_ON){
 
 		OSTaskSemPend(0, OS_OPT_PEND_BLOCKING, &ts,	&err);
-		if (err != OS_ERR_NONE)
-		{
+		if (err != OS_ERR_NONE) {
 			printf("Error Pending on Semaphore \n");
 			while(1){ ; }
 		}
@@ -125,16 +135,51 @@ void AppSPORTThread(void* arg)
 			printf("Sport GetBuffer Error\n");
 			while(1){;}
 		} else {
+			//Decimate Incoming data
+			uint32_t *pChannel;
+			pChannel = (uint32_t *)SPORTRxBuffer;
+			for (i=0; i<CHANNELS_NUMBER; i++){
+				dec_channels[i] += pChannel[i];
+			}
+			if (dec_cnt++ == 2){
+				for (i=0; i<CHANNELS_NUMBER; i++){
+					dec_channels[i] = dec_channels[i]/3.0f;
+					dec_cnt = 0;
+				}
+
+		        /* Access shared resource */
+		        OSMutexPend((OS_MUTEX  *)&MutexUARTSend,
+		        		(OS_TICK    )0,
+		        		(OS_OPT     )OS_OPT_PEND_BLOCKING,
+		        		(CPU_TS    *)0,
+		        		(OS_ERR    *)&err);
+				if (err != OS_ERR_NONE) {
+					printf("Error Pending on Mutex\n");
+					while(1){ ; }
+				}
+				//copy decimated adc channels data to the global buffer
+				memcpy(adc_decimated_channels, dec_channels, sizeof(float)*CHANNELS_NUMBER);
+		        OSMutexPost((OS_MUTEX  *)&MutexUARTSend,
+		        		(OS_OPT     )OS_OPT_POST_NONE,
+		        		(OS_ERR    *)&err);
+				if (err != OS_ERR_NONE) {
+					printf("Error Posting Mutex\n");
+					while(1){ ; }
+				}
+				adi_gpio_Toggle(ADI_GPIO_PORT_F0, ADI_GPIO_PIN_7);
+				memset(dec_channels, 0, sizeof(float)*CHANNELS_NUMBER);
+			}// if (dec_cnt++ == 2)
+
 			/* submit the buffer */
 			eResult = adi_sport_SubmitBuffer(hDevice,SPORTRxBuffer,SIZE_OF_RX_BUFFER);
 			if (eResult != ADI_SPORT_SUCCESS){
 				printf("Sport SubmitBuffer Error\n");
 				while(1){ ; }
 			}
-			adi_gpio_Toggle(ADI_GPIO_PORT_F0, ADI_GPIO_PIN_7);
-		}
+//			adi_gpio_Toggle(ADI_GPIO_PORT_F0, ADI_GPIO_PIN_7);
+		} // if (eResult...) else
 
-	}
+	}// while (DEF_ON)
 
 }
 
