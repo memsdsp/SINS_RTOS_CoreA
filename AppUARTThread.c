@@ -9,9 +9,17 @@
 #include <drivers/uart/adi_uart.h>
 #include <services/gpio/adi_gpio.h>
 #include <stdio.h>
+#include "X_report.h"
+
+/*-------------------Externals------------------------*/
+extern OS_MUTEX   MutexUARTSend;
+extern float adc_decimated_channels[8];
 
 /* UART driver memory */
 uint8_t driverMemory[ADI_UART_UNIDIR_DMA_MEMORY_SIZE];
+
+static PKT uart_packet;
+static uint8_t uart_tx_buffer[128];
 
 void AppUARTThread(void* arg)
 {
@@ -104,8 +112,32 @@ void AppUARTThread(void* arg)
 				printf("UART GetTxBuffer Error\n");
 				while(1){ ; }
 			}
-			/* submit the data to the UART device */
-			result = adi_uart_SubmitTxBuffer(hDevice, buffer, sizeof(buffer));
+
+			/* Access shared resource */
+			OSMutexPend((OS_MUTEX  *)&MutexUARTSend,
+					(OS_TICK    )0,
+					(OS_OPT     )OS_OPT_PEND_BLOCKING,
+					(CPU_TS    *)0,
+					(OS_ERR    *)&err);
+			if (err != OS_ERR_NONE) {
+				printf("Error Pending on Mutex\n");
+				while(1){ ; }
+			}
+			//copy decimated adc channels data to uart packet structure
+			pktADC(&uart_packet, adc_decimated_channels);
+			OSMutexPost((OS_MUTEX  *)&MutexUARTSend,
+					(OS_OPT     )OS_OPT_POST_NONE,
+					(OS_ERR    *)&err);
+			if (err != OS_ERR_NONE) {
+				printf("Error Posting Mutex\n");
+				while(1){ ; }
+			}
+
+			/* Fill UART transmit buffer */
+			uint8_t len = fill_buffer(&uart_packet, uart_tx_buffer);
+
+			/* submit the buffer to the UART device */
+			result = adi_uart_SubmitTxBuffer(hDevice, uart_tx_buffer, len);
 			if (result != ADI_UART_SUCCESS){
 				printf("UART SubmitTxBuffer Error\n");
 				while(1){ ; }
@@ -124,12 +156,6 @@ void AppUARTThread(void* arg)
 			printf("Error OSTimeDlyHMSM\n");
 			while(1){ ; }
 		}
-
-//		OSTimeDly(1000, OS_OPT_TIME_PERIODIC, &err);
-//		if (err != OS_ERR_NONE) {
-//			printf("Error OSTimeDlyHMSM\n");
-//			while(1){ ; }
-//		}
 
 	}// while {DEF_ON}
 
