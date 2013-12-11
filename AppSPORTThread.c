@@ -23,7 +23,11 @@
 
 /*-------------------Externals------------------------*/
 extern OS_MUTEX   MutexUARTSend;
+<<<<<<< HEAD
 extern float adc_decimated_channels[8];
+=======
+extern float adc_decimated_channels[CHANNELS_NUMBER];
+>>>>>>> a419f51813582d9f6fe1ee1c4746022088040e8e
 
 /* SPORT driver memory */
 uint8_t DeviceMemory[ADI_SPORT_DMA_MEMORY_SIZE];

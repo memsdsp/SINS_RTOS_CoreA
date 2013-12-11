@@ -13,12 +13,19 @@
 
 /*-------------------Externals------------------------*/
 extern OS_MUTEX   MutexUARTSend;
+<<<<<<< HEAD
 extern float adc_decimated_channels[8];
+=======
+>>>>>>> a419f51813582d9f6fe1ee1c4746022088040e8e
 
 /* UART driver memory */
 uint8_t driverMemory[ADI_UART_UNIDIR_DMA_MEMORY_SIZE];
 
 static PKT uart_packet;
+<<<<<<< HEAD
+=======
+static float float_channels[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+>>>>>>> a419f51813582d9f6fe1ee1c4746022088040e8e
 static uint8_t uart_tx_buffer[128];
 
 void AppUARTThread(void* arg)
@@ -113,6 +120,7 @@ void AppUARTThread(void* arg)
 				while(1){ ; }
 			}
 
+<<<<<<< HEAD
 			/* Access shared resource */
 			OSMutexPend((OS_MUTEX  *)&MutexUARTSend,
 					(OS_TICK    )0,
@@ -137,6 +145,12 @@ void AppUARTThread(void* arg)
 			uint8_t len = fill_buffer(&uart_packet, uart_tx_buffer);
 
 			/* submit the buffer to the UART device */
+=======
+			pktADC(&uart_packet, float_channels);
+			uint8_t len = fill_buffer(&uart_packet, uart_tx_buffer);
+
+			/* submit the data to the UART device */
+>>>>>>> a419f51813582d9f6fe1ee1c4746022088040e8e
 			result = adi_uart_SubmitTxBuffer(hDevice, uart_tx_buffer, len);
 			if (result != ADI_UART_SUCCESS){
 				printf("UART SubmitTxBuffer Error\n");
