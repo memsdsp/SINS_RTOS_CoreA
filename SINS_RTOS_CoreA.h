@@ -17,5 +17,12 @@ typedef struct
 	OS_TCB  TaskTCB;
 } TaskGlobals;
 
+typedef struct
+{
+	uint32_t   fcclk;
+	uint32_t   fsclk;
+	uint32_t BaudRate;
+} SystemParameters;
+
 
 #endif /* __SINS_RTOS_COREA_H__ */

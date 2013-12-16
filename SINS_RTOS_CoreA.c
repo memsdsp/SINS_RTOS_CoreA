@@ -24,6 +24,8 @@ static TaskGlobals AppTaskStartGlobals;
 //General Globals
 float adc_decimated_channels[8];
 
+SystemParameters system_parameters;
+
 int main(void)
 {
 	OS_ERR err;

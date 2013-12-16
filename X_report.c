@@ -25,7 +25,7 @@ unsigned char fill_buffer (PKT *rpt, unsigned char *buffer)
 	return k;
 }
 
-// DATA PACKET FOR IMU RESULTS 
+// DATA PACKET FOR ADC RESULTS
 void pktADC(PKT *rpt, float * data)
 {
 	ADCPacketStructure pack;
@@ -43,5 +43,24 @@ void pktADC(PKT *rpt, float * data)
 	rpt->code = 0xAA;
 }
 
+// DATA PACKET FOR Alive State
+void pktAlive(PKT *rpt, SystemParameters *data)
+{
+	AlivePacketStructure pack;
+	unsigned char check_sum = 0;
+	unsigned char *cbuf, *cbufend;
+
+	pack.fcclk = data->fcclk;
+	pack.fsclk = data->fsclk;
+	pack.BaudRate = data->BaudRate;
+
+	cbufend = (unsigned char *)&pack+sizeof(AlivePacketStructure)-1;
+	for (cbuf = (unsigned char *)&pack; cbuf < cbufend; cbuf++)
+		check_sum ^= *cbuf;
+	pack.check_sum = check_sum;
+	memcpy(rpt->buf, &pack, sizeof(AlivePacketStructure));
+	rpt->len = sizeof(AlivePacketStructure);
+	rpt->code = 0x11;
+}
 
 

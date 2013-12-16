@@ -17,7 +17,7 @@
 #include "AppSPORTThread.h"
 #include "AppUARTThread.h"
 
-
+extern SystemParameters system_parameters;
 
 /* ------------------ Globals------------------ */
 TaskGlobals AppTaskSPORTGlobals;
@@ -56,7 +56,7 @@ void AppStartThread(void* arg)
 			AppTaskUARTGlobals.TaskStack,				/* base of the stack */
 			TASK_STK_SIZE - 1u ,						/* limit for stack growth */
 			TASK_STK_SIZE,								/* stack size in CPU_STK */
-			0u,											/*number of messages allowed */
+			10u,										/*number of messages allowed */
 			(OS_TICK)  0u,								/* time_quanta */
 			NULL,										/* extension pointer */
 			(OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
@@ -81,6 +81,13 @@ void AppStartThread(void* arg)
 					printf("GPIO Toggle Error\n");
 					while(1){ ; }
 				}
+		OSTaskQPost(&(AppTaskUARTGlobals.TaskTCB), (void *)&system_parameters,
+				sizeof(system_parameters), OS_OPT_POST_FIFO, &err);
+		if (err != OS_ERR_NONE) {
+			printf("Error Posting  Message to UART Thread Queue\n");
+			while(1){ ; }
+		}
+
 	}
 }
 

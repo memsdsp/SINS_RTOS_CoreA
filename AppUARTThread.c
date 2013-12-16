@@ -10,11 +10,14 @@
 #include <services/gpio/adi_gpio.h>
 #include <stdio.h>
 #include "X_report.h"
+#include "SINS_RTOS_CoreA.h"
 
+#define BAUD_RATE 115200u
+#define MILLS 10u
 /*-------------------Externals------------------------*/
 extern OS_MUTEX   MutexUARTSend;
 extern float adc_decimated_channels[8];
-
+extern SystemParameters system_parameters;
 
 /* UART driver memory */
 uint8_t driverMemory[ADI_UART_UNIDIR_DMA_MEMORY_SIZE];
@@ -55,7 +58,7 @@ void AppUARTThread(void* arg)
 	}
 
 	/* Use the driver API's to configure UART */
-	ADI_UART_PARITY parity = ADI_UART_NO_PARITY;
+	ADI_UART_PARITY parity = ADI_UART_EVEN_PARITY;
 	ADI_UART_STOPBITS stopbits = ADI_UART_ONE_STOPBIT;
 	ADI_UART_WORDLEN  wordlen = ADI_UART_WORDLEN_8BITS;
 	result = adi_uart_SetConfiguration(hDevice, parity, stopbits, wordlen);
@@ -64,13 +67,18 @@ void AppUARTThread(void* arg)
 		while(1){ ; }
 	}
 
-	uint32_t BaudRate = 115200u;
+	uint32_t BaudRate = BAUD_RATE;
 	result = adi_uart_SetBaudRate(hDevice, BaudRate);
 	if (result != ADI_UART_SUCCESS){
 		printf("UART SetBaudRate Error\n");
 		while(1){ ; }
 	}
 
+	result = adi_uart_GetBaudRate(hDevice, &BaudRate);
+	if (result != ADI_UART_SUCCESS){
+		printf("UART SetBaudRate Error\n");
+		while(1){ ; }
+	}
 
 	/* submit the data to the UART device */
 	result = adi_uart_SubmitTxBuffer(hDevice, buffer, sizeof(buffer));
@@ -78,6 +86,7 @@ void AppUARTThread(void* arg)
 		printf("UART Submit TX Buffer Error\n");
 		while(1){ ; }
 	}
+	system_parameters.BaudRate = BaudRate;
 
 	/* enable the UART transfer */
 	result = adi_uart_EnableTx(hDevice, true);
@@ -107,24 +116,35 @@ void AppUARTThread(void* arg)
 				while(1){ ; }
 			}
 
-			/* Access shared resource */
-			OSMutexPend((OS_MUTEX  *)&MutexUARTSend,
-					(OS_TICK    )0,
-					(OS_OPT     )OS_OPT_PEND_BLOCKING,
-					(CPU_TS    *)0,
-					(OS_ERR    *)&err);
-			if (err != OS_ERR_NONE) {
-				printf("Error Pending on Mutex\n");
-				while(1){ ; }
-			}
-			//copy decimated adc channels data to uart packet structure
-			pktADC(&uart_packet, adc_decimated_channels);
-			OSMutexPost((OS_MUTEX  *)&MutexUARTSend,
-					(OS_OPT     )OS_OPT_POST_NONE,
-					(OS_ERR    *)&err);
-			if (err != OS_ERR_NONE) {
-				printf("Error Posting Mutex\n");
-				while(1){ ; }
+			/*Check if there is Alive message*/
+			OS_MSG_SIZE message_size;
+			void *message_alive;
+			message_alive = OSTaskQPend((OS_TICK)0u, OS_OPT_PEND_NON_BLOCKING, &message_size, NULL, &err);
+			if (err == OS_ERR_NONE){
+				//Send Alive Packet
+				//fill alive packet structure
+				pktAlive(&uart_packet, &system_parameters);
+			} else {
+				//Send ADC Data Packet
+				/* Access shared resource */
+				OSMutexPend((OS_MUTEX  *)&MutexUARTSend,
+						(OS_TICK    )0,
+						(OS_OPT     )OS_OPT_PEND_BLOCKING,
+						(CPU_TS    *)0,
+						(OS_ERR    *)&err);
+				if (err != OS_ERR_NONE) {
+					printf("Error Pending on Mutex\n");
+					while(1){ ; }
+				}
+				//copy decimated adc channels data to uart packet structure
+				pktADC(&uart_packet, adc_decimated_channels);
+				OSMutexPost((OS_MUTEX  *)&MutexUARTSend,
+						(OS_OPT     )OS_OPT_POST_NONE,
+						(OS_ERR    *)&err);
+				if (err != OS_ERR_NONE) {
+					printf("Error Posting Mutex\n");
+					while(1){ ; }
+				}
 			}
 
 			/* Fill UART transmit buffer */
@@ -138,8 +158,8 @@ void AppUARTThread(void* arg)
 			}
 		}// if (available)
 
-		// Suspend UART Thread for 10 milliseconds
-		CPU_INT32U mills = 10u;
+		// Suspend UART Thread for 2 millisecond (500 Hz)
+		CPU_INT32U mills = MILLS;
 		OSTimeDlyHMSM((CPU_INT16U)0,
 				(CPU_INT16U)0,
 				(CPU_INT16U)0,

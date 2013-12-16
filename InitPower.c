@@ -9,7 +9,9 @@
 #include <ccblkfn.h>
 #include <stdio.h>
 #include "InitPower.h"
+#include "SINS_RTOS_CoreA.h"
 
+extern SystemParameters system_parameters;
 
 static uint32_t callbackEvents;
 static bool bError;
@@ -35,32 +37,32 @@ static void setDefaultPower(void)
 	result = adi_pwr_SetDivideRegister(ADI_PWR_DIV_CSEL, CSEL_DEFAULT);
 }
 
-/* Callback function  */
-static void PWRCallback(void *pCBParam, uint32_t Event, void *pArg)
-{
-	uint32_t sclk;
-	ADI_PWR_MODE  mode;
-
-	switch ( (ADI_PWR_EVENT)Event )
-	{
-    case ADI_PWR_EVENT_FREQ_PRE_CHANGE:
-    	sclk = *(uint32_t*)(pArg);
-    	callbackEvents++;
-    	break;
-    case ADI_PWR_EVENT_FREQ_POST_CHANGE:
-    	sclk = *(uint32_t*)(pArg);
-    	callbackEvents++;
-    	break;
-    case ADI_PWR_EVENT_MODE_PRE_CHANGE:
-    	mode = *(ADI_PWR_MODE*)pArg;
-    	callbackEvents++;
-    	break;
-    case ADI_PWR_EVENT_MODE_POST_CHANGE:
-    	mode = *(ADI_PWR_MODE*)pArg;
-    	callbackEvents++;
-    	break;
-	}
-}
+///* Callback function  */
+//static void PWRCallback(void *pCBParam, uint32_t Event, void *pArg)
+//{
+//	uint32_t sclk;
+//	ADI_PWR_MODE  mode;
+//
+//	switch ( (ADI_PWR_EVENT)Event )
+//	{
+//    case ADI_PWR_EVENT_FREQ_PRE_CHANGE:
+//    	sclk = *(uint32_t*)(pArg);
+//    	callbackEvents++;
+//    	break;
+//    case ADI_PWR_EVENT_FREQ_POST_CHANGE:
+//    	sclk = *(uint32_t*)(pArg);
+//    	callbackEvents++;
+//    	break;
+//    case ADI_PWR_EVENT_MODE_PRE_CHANGE:
+//    	mode = *(ADI_PWR_MODE*)pArg;
+//    	callbackEvents++;
+//    	break;
+//    case ADI_PWR_EVENT_MODE_POST_CHANGE:
+//    	mode = *(ADI_PWR_MODE*)pArg;
+//    	callbackEvents++;
+//    	break;
+//	}
+//}
 
 void InitPower(void)
 {
@@ -73,7 +75,6 @@ void InitPower(void)
 	ADI_PWR_RESULT result;
 
 
-
 	bError = false;
 	callbackEvents = 0;
 	expectedEvents = 0;
@@ -81,8 +82,8 @@ void InitPower(void)
 	result = adi_pwr_Init(CLKIN, CORE_MAX, SYSTEM_MAX, VCO_MIN);
 	CheckResult(result);
 
-	result = adi_pwr_InstallCallback(PWRCallback);
-	CheckResult(result);
+//	result = adi_pwr_InstallCallback(PWRCallback);
+//	CheckResult(result);
 
 	setDefaultPower();
 
@@ -102,6 +103,9 @@ void InitPower(void)
 	{
 		bError = true;
 	}
+	system_parameters.fcclk = fcclk;
+	system_parameters.fsclk = fsclk;
+
 
 }
 

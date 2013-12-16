@@ -29,7 +29,8 @@ extern float adc_decimated_channels[8];
 uint8_t DeviceMemory[ADI_SPORT_DMA_MEMORY_SIZE];
 
 /* Tx buffers-0 */
-uint8_t SPORTRxBuffer[SIZE_OF_RX_BUFFER];
+uint8_t SPORTRxBuffer_1[SIZE_OF_RX_BUFFER];
+uint8_t SPORTRxBuffer_2[SIZE_OF_RX_BUFFER];
 
 static float dec_channels[CHANNELS_NUMBER];
 
@@ -107,8 +108,14 @@ void AppSPORTThread(void* arg)
 		while(1){ ; }
 	}
 
-	/* submit the buffer */
-	eResult = adi_sport_SubmitBuffer(hDevice,SPORTRxBuffer,SIZE_OF_RX_BUFFER);
+	/* submit the first buffer */
+	eResult = adi_sport_SubmitBuffer(hDevice,SPORTRxBuffer_1,SIZE_OF_RX_BUFFER);
+	if (eResult != ADI_SPORT_SUCCESS){
+		printf("Sport SubmitBuffer Error\n");
+		while(1){ ; }
+	}
+	/* submit the second buffer */
+	eResult = adi_sport_SubmitBuffer(hDevice,SPORTRxBuffer_2,SIZE_OF_RX_BUFFER);
 	if (eResult != ADI_SPORT_SUCCESS){
 		printf("Sport SubmitBuffer Error\n");
 		while(1){ ; }
@@ -137,10 +144,19 @@ void AppSPORTThread(void* arg)
 		} else {
 			//Decimate Incoming data
 			uint32_t *pChannel;
-			pChannel = (uint32_t *)SPORTRxBuffer;
+			pChannel = (uint32_t *)pProcessedBuffer;
 			for (i=0; i<CHANNELS_NUMBER; i++){
 				dec_channels[i] += pChannel[i];
 			}
+
+			/* submit processed buffer */
+			eResult = adi_sport_SubmitBuffer(hDevice, pProcessedBuffer, SIZE_OF_RX_BUFFER);
+			if (eResult != ADI_SPORT_SUCCESS){
+				printf("Sport SubmitBuffer Error\n");
+				while(1){ ; }
+			}
+
+			/*Decimate ADC data by factor of 3*/
 			if (dec_cnt++ == 2){
 				for (i=0; i<CHANNELS_NUMBER; i++){
 					dec_channels[i] = dec_channels[i]/3.0f;
@@ -157,8 +173,10 @@ void AppSPORTThread(void* arg)
 					printf("Error Pending on Mutex\n");
 					while(1){ ; }
 				}
-				//copy decimated adc channels data to the global buffer
+
+				//copy decimated ADC channels data to the global buffer
 				memcpy(adc_decimated_channels, dec_channels, sizeof(float)*CHANNELS_NUMBER);
+
 		        OSMutexPost((OS_MUTEX  *)&MutexUARTSend,
 		        		(OS_OPT     )OS_OPT_POST_NONE,
 		        		(OS_ERR    *)&err);
@@ -166,16 +184,12 @@ void AppSPORTThread(void* arg)
 					printf("Error Posting Mutex\n");
 					while(1){ ; }
 				}
+
 				adi_gpio_Toggle(ADI_GPIO_PORT_F0, ADI_GPIO_PIN_7);
+
 				memset(dec_channels, 0, sizeof(float)*CHANNELS_NUMBER);
 			}// if (dec_cnt++ == 2)
 
-			/* submit the buffer */
-			eResult = adi_sport_SubmitBuffer(hDevice,SPORTRxBuffer,SIZE_OF_RX_BUFFER);
-			if (eResult != ADI_SPORT_SUCCESS){
-				printf("Sport SubmitBuffer Error\n");
-				while(1){ ; }
-			}
 //			adi_gpio_Toggle(ADI_GPIO_PORT_F0, ADI_GPIO_PIN_7);
 		} // if (eResult...) else
 
