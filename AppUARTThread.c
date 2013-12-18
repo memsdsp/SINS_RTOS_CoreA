@@ -12,6 +12,7 @@
 #include "X_report.h"
 #include "SINS_RTOS_CoreA.h"
 
+#define UART_DEVICE_NUM 0u
 #define BAUD_RATE 115200u
 #define MILLS 10u
 /*-------------------Externals------------------------*/
@@ -24,6 +25,7 @@ uint8_t driverMemory[ADI_UART_UNIDIR_DMA_MEMORY_SIZE];
 
 static PKT uart_packet;
 static uint8_t uart_tx_buffer[128];
+static uint8_t uart_rx_buffer[16];
 
 void AppUARTThread(void* arg)
 {
@@ -34,7 +36,7 @@ void AppUARTThread(void* arg)
 	uint8_t *pBuffer;
 
 	/* buffer which holds data to transfer over UART */
-	uint8_t buffer[] = {1, 2, 3};
+	uint8_t buffer[] = {'S','I','N','S',' ','M','I','E','T','\n'};
 
 	/* UART Driver Handle */
 	ADI_UART_HANDLE hDevice;
@@ -43,8 +45,9 @@ void AppUARTThread(void* arg)
 	ADI_UART_RESULT result;
 
 
-	/* open the UART driver in Tx mode only */
-	result = adi_uart_Open(0, ADI_UART_DIR_TRANSMIT, driverMemory, ADI_UART_UNIDIR_DMA_MEMORY_SIZE, &hDevice);
+	/* open the UART driver in Bidirectional mode */
+	result = adi_uart_Open(UART_DEVICE_NUM, ADI_UART_DIR_BIDIRECTION, driverMemory,
+			ADI_UART_BIDIR_DMA_MEMORY_SIZE, &hDevice);
 	if (result != ADI_UART_SUCCESS){
 		printf("UART Open Error\n");
 		while(1){ ; }
@@ -79,21 +82,37 @@ void AppUARTThread(void* arg)
 		printf("UART SetBaudRate Error\n");
 		while(1){ ; }
 	}
+	system_parameters.BaudRate = BaudRate;
 
-	/* submit the data to the UART device */
+	/* submit the TX Buffer to the UART device */
 	result = adi_uart_SubmitTxBuffer(hDevice, buffer, sizeof(buffer));
 	if (result != ADI_UART_SUCCESS){
 		printf("UART Submit TX Buffer Error\n");
 		while(1){ ; }
 	}
-	system_parameters.BaudRate = BaudRate;
 
-	/* enable the UART transfer */
+	/* submit the RX Buffer to the UART device */
+	result = adi_uart_SubmitRxBuffer(hDevice, uart_rx_buffer, sizeof(uart_rx_buffer));
+	if (result != ADI_UART_SUCCESS){
+		printf("UART Submit RX Buffer Error\n");
+		while(1){ ; }
+	}
+
+
+	/* enable the UART Transmit */
 	result = adi_uart_EnableTx(hDevice, true);
 	if (result != ADI_UART_SUCCESS){
 		printf("UART EnableTx Error\n");
 		while(1){ ; }
 	}
+
+	/* enable the UART Receive */
+	result = adi_uart_EnableRx(hDevice, true);
+	if (result != ADI_UART_SUCCESS){
+		printf("UART EnableRx Error\n");
+		while(1){ ; }
+	}
+
 
 	while (DEF_ON){
 
@@ -123,7 +142,7 @@ void AppUARTThread(void* arg)
 			if (err == OS_ERR_NONE){
 				//Send Alive Packet
 				//fill alive packet structure
-				pktAlive(&uart_packet, &system_parameters);
+				pktAlive(&uart_packet, (SystemParameters *)message_alive);
 			} else {
 				//Send ADC Data Packet
 				/* Access shared resource */
@@ -158,7 +177,22 @@ void AppUARTThread(void* arg)
 			}
 		}// if (available)
 
-		// Suspend UART Thread for 2 millisecond (500 Hz)
+		/* Check if there is filled Receive buffer */
+		result = adi_uart_IsRxBufferAvailable(hDevice, &available);
+		if (result != ADI_UART_SUCCESS){
+			printf("UART IsBufferAvailable Error\n");
+			while(1){ ; }
+		}
+		if (available){
+			/* submit the RX Buffer to the UART device */
+			result = adi_uart_SubmitRxBuffer(hDevice, uart_rx_buffer, sizeof(uart_rx_buffer));
+			if (result != ADI_UART_SUCCESS){
+				printf("UART Submit RX Buffer Error\n");
+				while(1){ ; }
+			}
+		}
+
+		// Suspend UART Thread for mills number of  millisecond
 		CPU_INT32U mills = MILLS;
 		OSTimeDlyHMSM((CPU_INT16U)0,
 				(CPU_INT16U)0,

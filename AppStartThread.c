@@ -66,7 +66,17 @@ void AppStartThread(void* arg)
 		while(1){ ; }
 	}
 
+	//Send Alive Message
+	OSTaskQPost(&(AppTaskUARTGlobals.TaskTCB), (void *)&system_parameters,
+			sizeof(system_parameters), OS_OPT_POST_FIFO, &err);
+	if (err != OS_ERR_NONE) {
+		printf("Error Posting  Message to UART Thread Queue\n");
+		while(1){ ; }
+	}
+
 	while (DEF_ON){
+
+		//Delay for 1 second
 		OSTimeDlyHMSM((CPU_INT16U)0,
 				(CPU_INT16U)0,
 				(CPU_INT16U)1,
@@ -81,12 +91,6 @@ void AppStartThread(void* arg)
 					printf("GPIO Toggle Error\n");
 					while(1){ ; }
 				}
-		OSTaskQPost(&(AppTaskUARTGlobals.TaskTCB), (void *)&system_parameters,
-				sizeof(system_parameters), OS_OPT_POST_FIFO, &err);
-		if (err != OS_ERR_NONE) {
-			printf("Error Posting  Message to UART Thread Queue\n");
-			while(1){ ; }
-		}
 
 	}
 }
